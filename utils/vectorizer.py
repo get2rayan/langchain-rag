@@ -25,8 +25,7 @@ def save_vector_index():
     splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
     chunks = splitter.split_documents(docs)
 
-    embed = embeddings
-    db = FAISS.from_documents(chunks, embed)
+    db = FAISS.from_documents(chunks, embeddings)
 
     db.save_local("faiss_index")
 

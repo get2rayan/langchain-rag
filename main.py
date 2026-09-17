@@ -4,11 +4,16 @@ from langchain_groq import ChatGroq
 from utils.vectorizer import load_vector_index
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
 
 
 model = "groq/compound-mini"
 
-def get_llm_response(question: str, relevant_docs: list[Document]) -> str:
+def format_docs(docs: list[Document]) -> str:
+    return "\n".join(doc.page_content for doc in docs)
+
+
+def get_llm_response(question: str, retriever) -> str:
     llm = ChatGroq(model=model, 
                    temperature=0.5, 
                    api_key=os.environ.get("GROQ_API_KEY"))
@@ -19,9 +24,17 @@ def get_llm_response(question: str, relevant_docs: list[Document]) -> str:
 
     parser = StrOutputParser()
     
-    chain = prompt | llm | parser
+    chain = (
+        {
+            "context": retriever | format_docs,
+            "question": RunnablePassthrough(),
+        }
+        | prompt
+        | llm
+        | parser
+    )
 
-    result = chain.invoke({"context": "\n".join([doc.page_content for doc in relevant_docs]), "question": question})
+    result = chain.invoke(question)
 
     return result
 
@@ -31,8 +44,7 @@ def main():
     question = "What is the candidate's experience with Python?"
     db = load_vector_index()
     retriever = db.as_retriever(search_type="similarity", search_kwargs={"k": 3})
-    relevant_docs = retriever.invoke(question) 
-    print("get_llm_response: ", get_llm_response(question, relevant_docs))
+    print("get_llm_response: ", get_llm_response(question, retriever))
 
 
 
