@@ -8,7 +8,7 @@ load_dotenv()
 data_dir = Path(__file__).parent.parent / "data"
 
 
-def load_documents(file_path: Path = None):
+def load_pdf_documents(file_path: Path = None) -> list:
     """Load documents from all PDF files in the data directory, or from a specific file if provided."""
     docs = []
     
@@ -32,7 +32,7 @@ def load_documents(file_path: Path = None):
                     loader = PyPDFLoader(pdf_file)
                     loaded_docs = loader.load()
                     docs.extend(loaded_docs)
-                    print(f"Loaded {pdf_file.name}")
+                    print(f"Loaded {len(docs)} documents from {pdf_file.name}")
                 except Exception as e:
                     print(f"Error loading {pdf_file.name}: {e}")
         else:
@@ -42,7 +42,7 @@ def load_documents(file_path: Path = None):
 
 
 if __name__ == "__main__":
-    docs = load_documents()
+    docs = load_pdf_documents()
     print(f"Loaded {len(docs)} documents from data directory.")
     for i, doc in enumerate(docs):
         print(f"Document {i+1} content preview: {doc.page_content[:200]}")  # Print first 200 characters of each document
