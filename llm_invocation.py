@@ -10,15 +10,16 @@ from langchain_core.runnables import RunnablePassthrough
 
 model = "openai/gpt-oss-20b"
 
-class langchain_invoke:
+class Llm_chain:
     """Class involving langchain paradigm to answer user query"""
 
     def __init__(self, faiss_index: FAISS):
         self.retriever = faiss_index.as_retriever(search_type="similarity", search_kwargs={"k": 3, "score_threshold": 1.2})
 
+
     def format_docs(self, docs: list[Document]) -> str:
-        for i, doc in enumerate(docs):
-            print(f"\n{i+1}. {doc.page_content}\n")
+        for i, doc in enumerate(docs, start=1):
+            print(f"\n{i}. {doc.page_content}\n")
         return "\n\n".join(doc.page_content for doc in docs)
 
 
@@ -49,7 +50,7 @@ class langchain_invoke:
 
 def main():
     vectorizer = Vectorizer()
-    lang_chain = langchain_invoke(vectorizer.db)
+    lang_chain = Llm_chain(vectorizer.db)
     
     questions = ["What is the candidate's experience with AI?", "I want a recipe for a dessert which has least calories"]
     for question in questions:

@@ -1,104 +1,77 @@
 # langchain-rag
 
-A Retrieval-Augmented Generation (RAG) application built with LangChain.
+A LangChain Retrieval-Augmented Generation (RAG) demo that retrieves from PDF documents and recipe data using a local FAISS vector store, then generates answers with Groq.
 
 ## Project Structure
 
 ```
-langchain-rag/
-├── data/                    # PDF and other data files
-├── faiss_index/             # FAISS vector store index (generated)
-├── main.py                  # Main entry point for RAG queries
-├── loader.py                # PDF document loader
-├── pyproject.toml           # Project configuration
-├── utils/                   # Utility modules
-│   ├── __init__.py          # Package init
-│   ├── vectorizer.py        # Vector store operations
-│   └── loader.py            # Document loading utilities
-├── .env                     # Environment variables (API keys)
-├── .gitignore               # Git ignore rules
-├── uv.lock                  # uv lock file
-└── README.md                # This file
+.
+├── data/
+│   └── recipes_dataset.json  # Recipe records; add source PDFs here
+├── faiss_index/              # Generated locally; ignored by Git
+├── utils/
+│   ├── __init__.py          # Utility package
+│   ├── json_loader.py        # Converts recipe records to searchable text
+│   ├── pdf_loader.py         # Loads PDFs from data/
+│   └── vectorizer.py         # Builds or loads the FAISS index
+├── llm_invocation.py         # Runs the interactive-style example queries
+├── model_eval.py             # Runs the MLflow evaluation
+├── .env.template             # API key and evaluation setting examples
+├── .python-version            # Python version for uv
+├── pyproject.toml            # Dependencies and project metadata
+└── uv.lock                   # Locked dependency versions
 ```
 
-## Features
+## Requirements and Setup
 
-- **PDF Document Loading**: Loads and processes PDF resumes using `PyPDFLoader`
-- **Vector Search**: Creates and searches FAISS vector store for semantic similarity
-- **RAG Pipeline**: Combines document retrieval with LLM generation
-- **Modular Design**: Separate concerns with dedicated modules
+- Python 3.13 or newer
+- [uv](https://docs.astral.sh/uv/)
+- An OpenAI API key for embeddings and a Groq API key for generation
 
-## Prerequisites
-
-- Python 3.13+
-- API keys for:
-  - OpenAI (for embeddings)
-  - Groq (for LLM inference)
-
-## Installation
-
-1. Install dependencies:
-   ```bash
-   uv sync
-   ```
-
-2. Set up environment variables:
-   ```bash
-   cp .env.template .env
-   # Add your API keys to .env
-   ```
-
-3. Run the application:
-   ```bash
-   uv run main.py
-   ```
-
-## Usage
-
-### Loading Documents
-
-The `loader.py` module can load PDF documents from the `data/` directory. By default, it loads **all PDF files** found in the data folder:
+Install dependencies and create the local environment file:
 
 ```bash
-uv run utils/loader.py
+uv sync
+cp .env.template .env
 ```
 
-Or from the project root:
+Edit `.env` and replace the placeholder values for `OPENAI_API_KEY` and `GROQ_API_KEY`. The PDF loader loads this file when the application starts. Do not commit `.env`.
+
+## Data and Index
+
+Place PDF files in `data/`; the PDF loader processes every `*.pdf` file in that directory. The candidate-focused demo questions require relevant candidate documents, while the checked-in `recipes_dataset.json` supplies recipe content. Recipe text includes each recipe's name, cuisine, cook time, ingredients, and nutrition; instructions are not included in the indexed text.
+
+PDF pages are split into chunks of 500 characters with 100 characters of overlap. Embeddings use OpenAI's `text-embedding-3-small` model. The FAISS index is saved under `faiss_index/`, which is ignored by Git. If no index exists, the vectorizer builds one from the available PDFs and JSON data. It reuses an existing index on later runs; after changing source data, remove `faiss_index/` to rebuild it.
+
+## Run the RAG Demo
 
 ```bash
-uv run python -m utils.loader
+uv run llm_invocation.py
 ```
 
-**Output example:**
-```
-Loaded NP_Resume.pdf
-Loaded 2 documents from data directory.
-Document 1 content preview: PAGE 1 OF 2 ...
-Document 2 content preview: PAGE 2 OF 2 ...
-```
+The script runs two example questions, retrieves up to three relevant documents for each, and prints the generated answers. Generation uses Groq's `openai/gpt-oss-20b` model.
 
-**To load a specific file**, pass the path as an argument:
+## Model Evaluation
+
+Start the MLflow tracking server in one terminal:
 
 ```bash
-uv run python -c "from utils.loader import load_documents; docs = load_documents(Path('data/specific_file.pdf'))"
+uv run mlflow server --host 127.0.0.1 --port 5000
 ```
 
-The data directory can contain multiple PDF files, and the loader will process all of them, making it easy to add new documents without modifying the code.
-
-### Running the Main Application
+Then run the evaluation in another terminal:
 
 ```bash
-uv run main.py
+uv run model_eval.py
 ```
 
-This will:
-1. Load and vectorize documents
-2. Perform similarity search
-3. Get LLM response to queries
+The script evaluates five fixed questions and logs results to the `langchain-eval` experiment at `http://localhost:5000`. Its scorers check for a non-empty response, selected refusal phrases, and an expected keyword. The refusal-phrase check is a simple heuristic, not a groundedness or factuality measurement. Open the MLflow UI at `http://localhost:5000` to review runs.
 
-## Configuration
+MLflow trace validation can make a preliminary prediction on the first sample, which adds an LLM call. The supplied `.env.template` sets `MLFLOW_GENAI_EVAL_SKIP_TRACE_VALIDATION=True` to skip it. If that variable is not set in your environment, set it when running the evaluation:
 
-See `pyproject.toml` for project dependencies and configuration.
+```bash
+MLFLOW_GENAI_EVAL_SKIP_TRACE_VALIDATION=True uv run model_eval.py
+```
 
 ## License
 
